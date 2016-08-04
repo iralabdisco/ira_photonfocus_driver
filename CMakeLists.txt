@@ -289,7 +289,8 @@ add_library(ira_photonfocus src/photonfocus_camera.cpp)
 # add_executable(photonfocus_camera_node src/photonfocus_camera_node.cpp)
 
 # DRIVER
-add_executable(ira_photonfocus_driver src/photonfocus_driver.cpp)
+add_executable(ira_photonfocus_driver_mono src/photonfocus_driver_mono.cpp)
+add_executable(ira_photonfocus_driver_stereo src/photonfocus_driver_stereo.cpp)
 
 # UTILITIES
 add_executable(set_ip src/utilities/set_ip.cpp)
@@ -298,7 +299,8 @@ add_executable(find_camera src/utilities/find_camera.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(photonfocus_camera_node photonfocus_camera_generate_messages_cpp)
-add_dependencies(ira_photonfocus_driver ${PROJECT_NAME}_gencfg)
+add_dependencies(ira_photonfocus_driver_mono ${PROJECT_NAME}_gencfg)
+add_dependencies(ira_photonfocus_driver_stereo ${PROJECT_NAME}_gencfg)
 
 
 ## Specify libraries to link a library or executable target against
@@ -312,7 +314,14 @@ target_link_libraries(ira_photonfocus
     ${GNUTLS_LIBRARIES}
 )
 
-target_link_libraries(ira_photonfocus_driver
+target_link_libraries(ira_photonfocus_driver_mono
+    ira_photonfocus
+    ${EBUS_LIBRARIES}
+    ${catkin_LIBRARIES}
+    ${GNUTLS_LIBRARIES}
+)
+
+target_link_libraries(ira_photonfocus_driver_stereo
     ira_photonfocus
     ${EBUS_LIBRARIES}
     ${catkin_LIBRARIES}

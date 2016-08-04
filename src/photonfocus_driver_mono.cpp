@@ -24,7 +24,7 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <driver_base/SensorLevels.h>
-#include <ira_photonfocus_driver/photonfocusConfig.h>
+#include <ira_photonfocus_driver/photonfocus_monoConfig.h>
 
 #include <camera_info_manager/camera_info_manager.h>
 
@@ -48,7 +48,7 @@ private:
     std::string camera_name;
 
     // TODO Dynamic Reconfigure [with parameter server]
-    dynamic_reconfigure::Server<photonfocus_camera::photonfocusConfig> reconfig_svr_;
+    dynamic_reconfigure::Server<photonfocus_camera::photonfocus_monoConfig> reconfig_svr_;
 
     // Calibration Manager
     boost::shared_ptr<camera_info_manager::CameraInfoManager> calibration_manager;
@@ -104,7 +104,7 @@ public:
         publisher.publish(image,camera_info);
     }
 
-    void configCb(photonfocus_camera::photonfocusConfig & config, uint32_t level)
+    void configCb(photonfocus_camera::photonfocus_monoConfig & config, uint32_t level)
     {
         if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
             camera->stop();
