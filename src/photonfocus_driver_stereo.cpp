@@ -64,7 +64,7 @@ private:
     boost::shared_ptr<camera_info_manager::CameraInfoManager> calibration_manager_r;
 
     //Sync
-    std::vector<sensor_msgs::Image> l_imgs_buffer, r_imgs_buffer;
+    sensor_msgs::ImagePtr l_imgs_buffer, r_imgs_buffer;
     std::mutex mutex_l, mutex_r;
 
 public:
@@ -135,11 +135,11 @@ public:
         //camera_info->header.stamp = cv_image.header.stamp;
 
         mutex_r.lock();
-        if(r_imgs_buffer.size() > 0) {
+        if(r_imgs_buffer != NULL) {
             ros::Time ros_time = ros::Time::now();
-            sensor_msgs::Image local_r = r_imgs_buffer.at(r_imgs_buffer.size()-1);
+            sensor_msgs::Image local_r = *r_imgs_buffer;
             if(ros_time - local_r.header.stamp < ros::Duration(0.01)) {
-                r_imgs_buffer.clear();
+                r_imgs_buffer = NULL;
                 mutex_r.unlock();
 
                 sensor_msgs::CameraInfo::Ptr camera_info_l, camera_info_r;
@@ -160,8 +160,7 @@ public:
             else {
                 mutex_r.unlock();
                 mutex_l.lock();
-                l_imgs_buffer.clear();
-                l_imgs_buffer.push_back(*image_l);
+                l_imgs_buffer = image_l;
                 mutex_l.unlock();
             }
 
@@ -169,8 +168,7 @@ public:
         else {
             mutex_r.unlock();
             mutex_l.lock();
-            l_imgs_buffer.clear();
-            l_imgs_buffer.push_back(*image_l);
+            l_imgs_buffer = image_l;
             mutex_l.unlock();
         }
 
@@ -202,11 +200,11 @@ public:
         //camera_info->header.stamp = cv_image.header.stamp;
 
         mutex_l.lock();
-        if(l_imgs_buffer.size() > 0) {
+        if(l_imgs_buffer != NULL) {
             ros::Time ros_time = ros::Time::now();
-            sensor_msgs::Image local_l = l_imgs_buffer.at(l_imgs_buffer.size()-1);
+            sensor_msgs::Image local_l = *l_imgs_buffer;
             if(ros_time-local_l.header.stamp < ros::Duration(0.01)) {
-                l_imgs_buffer.clear();
+                l_imgs_buffer = NULL;
                 mutex_l.unlock();
 
                 sensor_msgs::CameraInfo::Ptr camera_info_l, camera_info_r;
@@ -227,8 +225,7 @@ public:
             else {
                 mutex_l.unlock();
                 mutex_r.lock();
-                r_imgs_buffer.clear();
-                r_imgs_buffer.push_back(*image_r);
+                r_imgs_buffer = image_r;
                 mutex_r.unlock();
             }
 
@@ -236,8 +233,7 @@ public:
         else {
             mutex_l.unlock();
             mutex_r.lock();
-            r_imgs_buffer.clear();
-            r_imgs_buffer.push_back(*image_r);
+            r_imgs_buffer = image_r;
             mutex_r.unlock();
         }
 
