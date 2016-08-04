@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ira_photonfocus_driver)
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
+SET (CMAKE_CXX_FLAGS "-std=c++11")
 
 # Architecture detection borrowed from: https://github.com/petroules/solar-cmake/blob/master/TargetArch.cmake
 # Based on the Qt 5 processor detection code, so should be very accurate

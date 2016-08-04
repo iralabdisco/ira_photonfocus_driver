@@ -29,6 +29,7 @@
 #include <camera_info_manager/camera_info_manager.h>
 
 #include <boost/scoped_ptr.hpp>
+#include <mutex>
 
 namespace IRALab
 {
@@ -62,6 +63,10 @@ private:
     boost::shared_ptr<camera_info_manager::CameraInfoManager> calibration_manager_l;
     boost::shared_ptr<camera_info_manager::CameraInfoManager> calibration_manager_r;
 
+    //Sync
+    std::vector<sensor_msgs::Image> l_imgs_buffer, r_imgs_buffer;
+    std::mutex mutex_l, mutex_r;
+
 public:
     PhotonFocusDriver(std::string camera_name_l, std::string camera_name_r, std::string ip_l, std::string ip_r, const ros::NodeHandle & node_handle_l, const ros::NodeHandle & node_handle_r):
         node_handle_l(node_handle_l),
@@ -88,7 +93,9 @@ public:
         // TODO parameter server callback
         // TODO parameter server callback
         reconfig_svr_r.reset(new dynamic_reconfigure::Server<photonfocus_camera::photonfocus_monoConfig>(node_handle_r));
-        reconfig_svr_r -> setCallback(boost::bind(&PhotonFocusDriver::configCb_r, this, _1, _2));
+        dynamic_reconfigure::Server<photonfocus_camera::photonfocus_monoConfig>::CallbackType f_r;
+        f_r = boost::bind(&PhotonFocusDriver::configCb_r, this, _1, _2);
+        reconfig_svr_r -> setCallback(f_r);
 
         std::cout << std::setw(80) << std::setfill(' ') << std::left << "===== PhotonFocus Camera ----- START ===== " << std::endl;
     }
@@ -104,13 +111,15 @@ public:
 
     void publishImage_l(const cv::Mat img)
     {
+
+        //std::cout<<"LEFT\n";
         cv_bridge::CvImage cv_image;
         cv_image.encoding = "mono8";
         cv_image.image = img;
         cv_image.header.stamp = ros::Time::now();
         image_l = cv_image.toImageMsg();
 
-        sensor_msgs::CameraInfo::Ptr camera_info;
+        /*sensor_msgs::CameraInfo::Ptr camera_info;
         if(calibration_manager_l->isCalibrated()) // calibration exists
             camera_info.reset(new sensor_msgs::CameraInfo(calibration_manager_l->getCameraInfo()));
         else // calibration doesn't exist
@@ -118,25 +127,66 @@ public:
             camera_info.reset(new sensor_msgs::CameraInfo());
             camera_info->width = image_l->width;
             camera_info->height = image_l->height;
-        }
+        }*/
 
 		// WARNING for calibration with cameracalibrator for ROS replace "stereo_rig" with ("/" + camera_name) in both next 2 lines
         image_l->header.frame_id = "stereo_rig";
-        camera_info->header.frame_id = "stereo_rig";
-        camera_info->header.stamp = cv_image.header.stamp;
+        //camera_info->header.frame_id = "stereo_rig";
+        //camera_info->header.stamp = cv_image.header.stamp;
 
-        publisher_l.publish(image_l,camera_info);
+        mutex_r.lock();
+        if(r_imgs_buffer.size() > 0) {
+            ros::Time ros_time = ros::Time::now();
+            sensor_msgs::Image local_r = r_imgs_buffer.at(r_imgs_buffer.size()-1);
+            if(ros_time - local_r.header.stamp < ros::Duration(0.01)) {
+                r_imgs_buffer.clear();
+                mutex_r.unlock();
+
+                sensor_msgs::CameraInfo::Ptr camera_info_l, camera_info_r;
+                camera_info_l.reset(new sensor_msgs::CameraInfo(calibration_manager_l->getCameraInfo()));
+                camera_info_r.reset(new sensor_msgs::CameraInfo(calibration_manager_r->getCameraInfo()));
+                camera_info_l->header.frame_id = "stereo_rig";
+                camera_info_r->header.frame_id = "stereo_rig";
+                camera_info_l->header.stamp = ros_time;
+                camera_info_r->header.stamp = ros_time;
+
+                image_l->header.frame_id = "stereo_rig";
+                image_l->header.stamp = ros_time;
+                local_r.header.stamp = ros_time;
+
+                publisher_r.publish(local_r,*camera_info_r);
+                publisher_l.publish(image_l,camera_info_l);
+            }
+            else {
+                mutex_r.unlock();
+                mutex_l.lock();
+                l_imgs_buffer.clear();
+                l_imgs_buffer.push_back(*image_l);
+                mutex_l.unlock();
+            }
+
+        }
+        else {
+            mutex_r.unlock();
+            mutex_l.lock();
+            l_imgs_buffer.clear();
+            l_imgs_buffer.push_back(*image_l);
+            mutex_l.unlock();
+        }
+
+        //publisher_l.publish(image_l,camera_info);
     }
 
     void publishImage_r(const cv::Mat img)
     {
+        //std::cout<<"RIGHT\n";
         cv_bridge::CvImage cv_image;
         cv_image.encoding = "mono8";
         cv_image.image = img;
         cv_image.header.stamp = ros::Time::now();
         image_r = cv_image.toImageMsg();
 
-        sensor_msgs::CameraInfo::Ptr camera_info;
+        /*sensor_msgs::CameraInfo::Ptr camera_info;
         if(calibration_manager_r->isCalibrated()) // calibration exists
             camera_info.reset(new sensor_msgs::CameraInfo(calibration_manager_r->getCameraInfo()));
         else // calibration doesn't exist
@@ -144,14 +194,54 @@ public:
             camera_info.reset(new sensor_msgs::CameraInfo());
             camera_info->width = image_r->width;
             camera_info->height = image_r->height;
-        }
+        }*/
 
         // WARNING for calibration with cameracalibrator for ROS replace "stereo_rig" with ("/" + camera_name) in both next 2 lines
         image_r->header.frame_id = "stereo_rig";
-        camera_info->header.frame_id = "stereo_rig";
-        camera_info->header.stamp = cv_image.header.stamp;
+        //camera_info->header.frame_id = "stereo_rig";
+        //camera_info->header.stamp = cv_image.header.stamp;
 
-        publisher_r.publish(image_r,camera_info);
+        mutex_l.lock();
+        if(l_imgs_buffer.size() > 0) {
+            ros::Time ros_time = ros::Time::now();
+            sensor_msgs::Image local_l = l_imgs_buffer.at(l_imgs_buffer.size()-1);
+            if(ros_time-local_l.header.stamp < ros::Duration(0.01)) {
+                l_imgs_buffer.clear();
+                mutex_l.unlock();
+
+                sensor_msgs::CameraInfo::Ptr camera_info_l, camera_info_r;
+                camera_info_l.reset(new sensor_msgs::CameraInfo(calibration_manager_l->getCameraInfo()));
+                camera_info_r.reset(new sensor_msgs::CameraInfo(calibration_manager_r->getCameraInfo()));
+                camera_info_l->header.frame_id = "stereo_rig";
+                camera_info_r->header.frame_id = "stereo_rig";
+                camera_info_l->header.stamp = ros_time;
+                camera_info_r->header.stamp = ros_time;
+
+                image_r->header.frame_id = "stereo_rig";
+                image_r->header.stamp = ros_time;
+                local_l.header.stamp = ros_time;
+
+                publisher_r.publish(local_l,*camera_info_r);
+                publisher_l.publish(image_r,camera_info_l   );
+            }
+            else {
+                mutex_l.unlock();
+                mutex_r.lock();
+                r_imgs_buffer.clear();
+                r_imgs_buffer.push_back(*image_r);
+                mutex_r.unlock();
+            }
+
+        }
+        else {
+            mutex_l.unlock();
+            mutex_r.lock();
+            r_imgs_buffer.clear();
+            r_imgs_buffer.push_back(*image_r);
+            mutex_r.unlock();
+        }
+
+        //publisher_r.publish(image_r,camera_info);
     }
 
     void configCb_l(photonfocus_camera::photonfocus_monoConfig & config, uint32_t level)
