@@ -67,6 +67,11 @@ private:
     sensor_msgs::ImagePtr l_imgs_buffer, r_imgs_buffer;
     std::mutex mutex_l, mutex_r;
 
+    //Automatic Exposure
+    bool automatic_exposure = true;
+    double prev_exposure = 20.0;
+    double frametime = 50;
+
 public:
     PhotonFocusDriver(std::string camera_name_l, std::string camera_name_r, std::string ip_l, std::string ip_r, const ros::NodeHandle & node_handle_l, const ros::NodeHandle & node_handle_r):
         node_handle_l(node_handle_l),
@@ -118,6 +123,16 @@ public:
         cv_image.image = img;
         cv_image.header.stamp = ros::Time::now();
         image_l = cv_image.toImageMsg();
+
+        //Exposure Control
+        cv::Scalar mean = cv::mean(img);
+        double b_mean = mean[0];
+        double new_exposure = prev_exposure * 128.0 / b_mean;
+        if(new_exposure >= frametime) {
+            new_exposure = frametime - 0.1;
+        }
+        if(new_exposure < 0.1)
+            new_exposure = 0.1;
 
         /*sensor_msgs::CameraInfo::Ptr camera_info;
         if(calibration_manager_l->isCalibrated()) // calibration exists
@@ -171,6 +186,13 @@ public:
             l_imgs_buffer = image_l;
             mutex_l.unlock();
         }
+
+        if(automatic_exposure) {
+            std::cout << "\nNEW_EXPOSURE" << new_exposure<<"\n";
+            camera_l->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",new_exposure);
+            prev_exposure = new_exposure;
+        }
+
 
         //publisher_l.publish(image_l,camera_info);
     }
@@ -237,6 +259,11 @@ public:
             mutex_r.unlock();
         }
 
+
+
+        //Exposure
+        if(automatic_exposure)
+            camera_r->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",prev_exposure);
         //publisher_r.publish(image_r,camera_info);
     }
 
@@ -256,9 +283,12 @@ public:
 
         //# ----- Exposure and FrameRate -----
         camera_l->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",config.ExposureTimeAbs);
+        prev_exposure = config.ExposureTimeAbs;
         camera_l->setDeviceAttribute<PvGenBoolean,bool>("ConstantFramerate_CFR",config.ConstantFramerate_CFR);
-        if(config.ConstantFramerate_CFR)
+        if(config.ConstantFramerate_CFR) {
             camera_l->setDeviceAttribute<PvGenFloat,double>("Frametime",config.Frametime);
+            frametime = config.Frametime;
+        }
 
         camera_l->setDeviceAttribute<PvGenBoolean,bool>("Trigger_Interleave",config.Trigger_Interleave);
         if(!config.Trigger_Interleave)\
