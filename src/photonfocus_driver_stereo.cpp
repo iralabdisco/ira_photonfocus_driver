@@ -4,7 +4,7 @@
  *      Universita' degli Studi Milano - Bicocca, DISCO                    *
  *      Building U14, viale Sarca 336, 20126, Milano, Italy                *
  *                                                                         *
- *   Author:	Alberto Invernizzi                       		           *
+ *   Author:    Alberto Invernizzi                                         *
  *   Email:     alby.inve@gmail.com                                        *
  *   Date:      08/10/2014                                                 *
  *                                                                         *
@@ -80,11 +80,11 @@ public:
         image_transport_r(node_handle_r),
         camera_name_l(camera_name_l),
         camera_name_r(camera_name_r),
-        calibration_manager_l(new camera_info_manager::CameraInfoManager(node_handle_l,camera_name_l)),
-        calibration_manager_r(new camera_info_manager::CameraInfoManager(node_handle_r,camera_name_r))
+        calibration_manager_l(new camera_info_manager::CameraInfoManager(node_handle_l, camera_name_l)),
+        calibration_manager_r(new camera_info_manager::CameraInfoManager(node_handle_r, camera_name_r))
     {
-        publisher_l = image_transport_l.advertiseCamera("image_raw",1);
-        publisher_r = image_transport_r.advertiseCamera("image_raw",1);
+        publisher_l = image_transport_l.advertiseCamera("image_raw", 1);
+        publisher_r = image_transport_r.advertiseCamera("image_raw", 1);
 
         camera_l.reset(new IRALab::PhotonFocusCamera(ip_l));
         camera_l->start();
@@ -116,6 +116,7 @@ public:
 
     void publishImage_l(const cv::Mat img)
     {
+        mutex_r.lock();
 
         //std::cout<<"LEFT\n";
         cv_bridge::CvImage cv_image;
@@ -128,10 +129,11 @@ public:
         cv::Scalar mean = cv::mean(img);
         double b_mean = mean[0];
         double new_exposure = prev_exposure * 128.0 / b_mean;
-        if(new_exposure >= frametime) {
-            new_exposure = frametime - 0.1;
+        if (new_exposure >= frametime)
+        {
+            new_exposure = frametime - 30.0;
         }
-        if(new_exposure < 0.1)
+        if (new_exposure < 0.1)
             new_exposure = 0.1;
 
         /*sensor_msgs::CameraInfo::Ptr camera_info;
@@ -144,18 +146,19 @@ public:
             camera_info->height = image_l->height;
         }*/
 
-		// WARNING for calibration with cameracalibrator for ROS replace "stereo_rig" with ("/" + camera_name) in both next 2 lines
+        // WARNING for calibration with cameracalibrator for ROS replace "stereo_rig" with ("/" + camera_name) in both next 2 lines
         image_l->header.frame_id = "stereo_rig";
         //camera_info->header.frame_id = "stereo_rig";
         //camera_info->header.stamp = cv_image.header.stamp;
 
-        mutex_r.lock();
-        if(r_imgs_buffer != NULL) {
+        //mutex_r.lock();
+        if (r_imgs_buffer != NULL)
+        {
             ros::Time ros_time = ros::Time::now();
             sensor_msgs::Image local_r = *r_imgs_buffer;
-            if(ros_time - local_r.header.stamp < ros::Duration(0.01)) {
-                r_imgs_buffer = NULL;
-                mutex_r.unlock();
+            if (ros_time - local_r.header.stamp < ros::Duration(0.01))
+            {
+                //mutex_r.unlock();
 
                 sensor_msgs::CameraInfo::Ptr camera_info_l, camera_info_r;
                 camera_info_l.reset(new sensor_msgs::CameraInfo(calibration_manager_l->getCameraInfo()));
@@ -169,36 +172,45 @@ public:
                 image_l->header.stamp = ros_time;
                 local_r.header.stamp = ros_time;
 
-                publisher_r.publish(local_r,*camera_info_r);
-                publisher_l.publish(image_l,camera_info_l);
+                publisher_r.publish(local_r, *camera_info_r);
+                publisher_l.publish(image_l, camera_info_l);
+                r_imgs_buffer.reset();
+                image_l.reset();
             }
-            else {
-                mutex_r.unlock();
-                mutex_l.lock();
+            else
+            {
+                //mutex_r.unlock();
+                //mutex_l.lock();
                 l_imgs_buffer = image_l;
-                mutex_l.unlock();
+                //mutex_l.unlock();
             }
 
         }
-        else {
-            mutex_r.unlock();
-            mutex_l.lock();
+        else
+        {
+            //mutex_r.unlock();
+            //mutex_l.lock();
             l_imgs_buffer = image_l;
-            mutex_l.unlock();
+            //mutex_l.unlock();
         }
 
-        if(automatic_exposure) {
-            std::cout << "\nNEW_EXPOSURE" << new_exposure<<"\n";
-            camera_l->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",new_exposure);
-            prev_exposure = new_exposure;
+        if (automatic_exposure)
+        {
+            if (abs(b_mean - 128.0) > 10)
+            {
+                std::cout << "\nNEW_EXPOSURE" << new_exposure << "\n";
+                camera_l->setDeviceAttribute<PvGenFloat, double>("ExposureTimeAbs", new_exposure);
+                prev_exposure = new_exposure;
+            }
         }
 
-
+        mutex_r.unlock();
         //publisher_l.publish(image_l,camera_info);
     }
 
     void publishImage_r(const cv::Mat img)
     {
+        mutex_r.lock();
         //std::cout<<"RIGHT\n";
         cv_bridge::CvImage cv_image;
         cv_image.encoding = "mono8";
@@ -221,13 +233,15 @@ public:
         //camera_info->header.frame_id = "stereo_rig";
         //camera_info->header.stamp = cv_image.header.stamp;
 
-        mutex_l.lock();
-        if(l_imgs_buffer != NULL) {
+        //mutex_l.lock();
+        if (l_imgs_buffer != NULL)
+        {
             ros::Time ros_time = ros::Time::now();
             sensor_msgs::Image local_l = *l_imgs_buffer;
-            if(ros_time-local_l.header.stamp < ros::Duration(0.01)) {
+            if (ros_time - local_l.header.stamp < ros::Duration(0.1))
+            {
                 l_imgs_buffer = NULL;
-                mutex_l.unlock();
+                //mutex_l.unlock();
 
                 sensor_msgs::CameraInfo::Ptr camera_info_l, camera_info_r;
                 camera_info_l.reset(new sensor_msgs::CameraInfo(calibration_manager_l->getCameraInfo()));
@@ -241,110 +255,118 @@ public:
                 image_r->header.stamp = ros_time;
                 local_l.header.stamp = ros_time;
 
-                publisher_r.publish(local_l,*camera_info_r);
-                publisher_l.publish(image_r,camera_info_l   );
+                publisher_r.publish(local_l, *camera_info_r);
+                publisher_l.publish(image_r, camera_info_l);
+                l_imgs_buffer.reset();
+                image_r.reset();
+
             }
-            else {
-                mutex_l.unlock();
-                mutex_r.lock();
+            else
+            {
+                //mutex_l.unlock();
+                //mutex_r.lock();
                 r_imgs_buffer = image_r;
-                mutex_r.unlock();
+                //mutex_r.unlock();
             }
 
         }
-        else {
-            mutex_l.unlock();
-            mutex_r.lock();
+        else
+        {
+            //mutex_l.unlock();
+            //mutex_r.lock();
             r_imgs_buffer = image_r;
-            mutex_r.unlock();
+            //mutex_r.unlock();
         }
 
 
 
         //Exposure
-        if(automatic_exposure)
-            camera_r->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",prev_exposure);
+        if (automatic_exposure)
+            camera_r->setDeviceAttribute<PvGenFloat, double>("ExposureTimeAbs", prev_exposure);
         //publisher_r.publish(image_r,camera_info);
+
+        mutex_r.unlock();
     }
 
     void configCb_l(photonfocus_camera::photonfocus_monoConfig & config, uint32_t level)
     {
-        if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
+        if (level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
             camera_l->stop();
 
-        camera_l->setDeviceAttribute<PvGenEnum,std::string>("PixelFormat","Mono8");
+        camera_l->setDeviceAttribute<PvGenEnum, std::string>("PixelFormat", "Mono8");
 
         //# ----- Image Size Control -----
-        camera_l->setDeviceAttribute<PvGenInteger,long>("Width",config.Width*32+768);
-        camera_l->setDeviceAttribute<PvGenInteger,long>("Height",config.Height);
+        camera_l->setDeviceAttribute<PvGenInteger, long>("Width", config.Width * 32 + 768);
+        camera_l->setDeviceAttribute<PvGenInteger, long>("Height", config.Height);
 
-        camera_l->setDeviceAttribute<PvGenInteger,long>("OffsetX",config.OffsetX*32);
-        camera_l->setDeviceAttribute<PvGenInteger,long>("OffsetY",config.OffsetY);
+        camera_l->setDeviceAttribute<PvGenInteger, long>("OffsetX", config.OffsetX * 32);
+        camera_l->setDeviceAttribute<PvGenInteger, long>("OffsetY", config.OffsetY);
 
         //# ----- Exposure and FrameRate -----
-        camera_l->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",config.ExposureTimeAbs);
+        camera_l->setDeviceAttribute<PvGenFloat, double>("ExposureTimeAbs", config.ExposureTimeAbs);
         prev_exposure = config.ExposureTimeAbs;
-        camera_l->setDeviceAttribute<PvGenBoolean,bool>("ConstantFramerate_CFR",config.ConstantFramerate_CFR);
-        if(config.ConstantFramerate_CFR) {
-            camera_l->setDeviceAttribute<PvGenFloat,double>("Frametime",config.Frametime);
+        camera_l->setDeviceAttribute<PvGenBoolean, bool>("ConstantFramerate_CFR", config.ConstantFramerate_CFR);
+        if (config.ConstantFramerate_CFR)
+        {
+            camera_l->setDeviceAttribute<PvGenFloat, double>("Frametime", config.Frametime);
             frametime = config.Frametime;
         }
 
-        camera_l->setDeviceAttribute<PvGenBoolean,bool>("Trigger_Interleave",config.Trigger_Interleave);
-        if(!config.Trigger_Interleave)\
+        camera_l->setDeviceAttribute<PvGenBoolean, bool>("Trigger_Interleave", config.Trigger_Interleave);
+        if (!config.Trigger_Interleave)\
         {
-            camera_l->setDeviceAttribute<PvGenEnum,long>("LinLog_Mode",config.LinLog_Mode);
-            if(config.LinLog_Mode == 4)
+            camera_l->setDeviceAttribute<PvGenEnum, long>("LinLog_Mode", config.LinLog_Mode);
+            if (config.LinLog_Mode == 4)
             {
                 std::cout << "UserDefined" << std::endl;
-                camera_l->setDeviceAttribute<PvGenInteger,long>("LinLog_Value1",config.LinLog_Value1);
-                camera_l->setDeviceAttribute<PvGenInteger,long>("LinLog_Value2",config.LinLog_Value2);
-                camera_l->setDeviceAttribute<PvGenInteger,long>("LinLog_Time1",config.LinLog_Time1);
-                camera_l->setDeviceAttribute<PvGenInteger,long>("LinLog_Time2",config.LinLog_Time2);
+                camera_l->setDeviceAttribute<PvGenInteger, long>("LinLog_Value1", config.LinLog_Value1);
+                camera_l->setDeviceAttribute<PvGenInteger, long>("LinLog_Value2", config.LinLog_Value2);
+                camera_l->setDeviceAttribute<PvGenInteger, long>("LinLog_Time1", config.LinLog_Time1);
+                camera_l->setDeviceAttribute<PvGenInteger, long>("LinLog_Time2", config.LinLog_Time2);
             }
         }
-        camera_l->setDeviceAttribute<PvGenInteger,long>("Voltages_BlackLevelOffset",config.Voltages_BlackLevelOffset);
+        camera_l->setDeviceAttribute<PvGenInteger, long>("Voltages_BlackLevelOffset", config.Voltages_BlackLevelOffset);
 
-        if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
+        if (level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
             camera_l->start();
     }
 
     void configCb_r(photonfocus_camera::photonfocus_monoConfig & config, uint32_t level)
     {
-        if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
+        if (level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
             camera_r->stop();
 
-        camera_r->setDeviceAttribute<PvGenEnum,std::string>("PixelFormat","Mono8");
+        camera_r->setDeviceAttribute<PvGenEnum, std::string>("PixelFormat", "Mono8");
 
         //# ----- Image Size Control -----
-        camera_r->setDeviceAttribute<PvGenInteger,long>("Width",config.Width*32+768);
-        camera_r->setDeviceAttribute<PvGenInteger,long>("Height",config.Height);
+        camera_r->setDeviceAttribute<PvGenInteger, long>("Width", config.Width * 32 + 768);
+        camera_r->setDeviceAttribute<PvGenInteger, long>("Height", config.Height);
 
-        camera_r->setDeviceAttribute<PvGenInteger,long>("OffsetX",config.OffsetX*32);
-        camera_r->setDeviceAttribute<PvGenInteger,long>("OffsetY",config.OffsetY);
+        camera_r->setDeviceAttribute<PvGenInteger, long>("OffsetX", config.OffsetX * 32);
+        camera_r->setDeviceAttribute<PvGenInteger, long>("OffsetY", config.OffsetY);
 
         //# ----- Exposure and FrameRate -----
-        camera_r->setDeviceAttribute<PvGenFloat,double>("ExposureTimeAbs",config.ExposureTimeAbs);
-        camera_r->setDeviceAttribute<PvGenBoolean,bool>("ConstantFramerate_CFR",config.ConstantFramerate_CFR);
-        if(config.ConstantFramerate_CFR)
-            camera_r->setDeviceAttribute<PvGenFloat,double>("Frametime",config.Frametime);
+        camera_r->setDeviceAttribute<PvGenFloat, double>("ExposureTimeAbs", config.ExposureTimeAbs);
+        camera_r->setDeviceAttribute<PvGenBoolean, bool>("ConstantFramerate_CFR", config.ConstantFramerate_CFR);
+        if (config.ConstantFramerate_CFR)
+            camera_r->setDeviceAttribute<PvGenFloat, double>("Frametime", config.Frametime);
 
-        camera_r->setDeviceAttribute<PvGenBoolean,bool>("Trigger_Interleave",config.Trigger_Interleave);
-        if(!config.Trigger_Interleave)\
+        camera_r->setDeviceAttribute<PvGenBoolean, bool>("Trigger_Interleave", config.Trigger_Interleave);
+        if (!config.Trigger_Interleave)\
         {
-            camera_r->setDeviceAttribute<PvGenEnum,long>("LinLog_Mode",config.LinLog_Mode);
-            if(config.LinLog_Mode == 4)
+            camera_r->setDeviceAttribute<PvGenEnum, long>("LinLog_Mode", config.LinLog_Mode);
+            if (config.LinLog_Mode == 4)
             {
                 std::cout << "UserDefined" << std::endl;
-                camera_r->setDeviceAttribute<PvGenInteger,long>("LinLog_Value1",config.LinLog_Value1);
-                camera_r->setDeviceAttribute<PvGenInteger,long>("LinLog_Value2",config.LinLog_Value2);
-                camera_r->setDeviceAttribute<PvGenInteger,long>("LinLog_Time1",config.LinLog_Time1);
-                camera_r->setDeviceAttribute<PvGenInteger,long>("LinLog_Time2",config.LinLog_Time2);
+                camera_r->setDeviceAttribute<PvGenInteger, long>("LinLog_Value1", config.LinLog_Value1);
+                camera_r->setDeviceAttribute<PvGenInteger, long>("LinLog_Value2", config.LinLog_Value2);
+                camera_r->setDeviceAttribute<PvGenInteger, long>("LinLog_Time1", config.LinLog_Time1);
+                camera_r->setDeviceAttribute<PvGenInteger, long>("LinLog_Time2", config.LinLog_Time2);
             }
         }
-        camera_r->setDeviceAttribute<PvGenInteger,long>("Voltages_BlackLevelOffset",config.Voltages_BlackLevelOffset);
+        camera_r->setDeviceAttribute<PvGenInteger, long>("Voltages_BlackLevelOffset", config.Voltages_BlackLevelOffset);
 
-        if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
+        if (level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
             camera_r->start();
     }
 
@@ -360,17 +382,17 @@ void signal_handler(int sig_code)
 
 int main(int argc, char **argv)
 {
-    ros::init(argc,argv,"ira_photonfocus");
+    ros::init(argc, argv, "ira_photonfocus");
     ros::NodeHandle nh("~");
     ros::NodeHandle node_handlel("~/left");
     ros::NodeHandle node_handler("~/right");
 
-    signal(SIGINT,signal_handler);
+    signal(SIGINT, signal_handler);
 
     std::string ip_l;
     std::string ip_r;
 
-    if(!nh.getParam("ip_left",ip_l) || !nh.getParam("ip_right",ip_r))
+    if (!nh.getParam("ip_left", ip_l) || !nh.getParam("ip_right", ip_r))
     {
         std::cout << "Usage: " << argv[0] << " _ip_left:=IP_ADDRESS, _ip_right:=IP_ADDRESS" << std::endl;
         return 0;
@@ -383,7 +405,7 @@ int main(int argc, char **argv)
 
     boost::shared_ptr<IRALab::PhotonFocusDriver> camera_node(new IRALab::PhotonFocusDriver(camera_name_l, camera_name_r, ip_l, ip_r, node_handlel, node_handler));
 
-    while(ros::ok() && !ros_shutdown)
+    while (ros::ok() && !ros_shutdown)
         ros::spinOnce();
 
     // the node is shutting down...cleaning
