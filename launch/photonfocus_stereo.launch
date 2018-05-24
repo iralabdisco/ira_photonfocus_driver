@@ -1,0 +1,19 @@
+<launch> 
+  <!-- 
+	Valori exposure:
+				* esterno luce solare		   0.1
+				* garage u5:							25.0
+  -->
+
+  <node pkg="ira_photonfocus_driver" type="ira_photonfocus_driver_stereo" name="my_stereo" output="screen">
+    <param name="ip_left" value="192.168.1.221"/>
+    <param name="ip_right" value="192.168.1.220"/>
+		<param name="left/Height" value="541" />
+    <param name="left/OffsetY" value="350" />
+	  <param name="ExposureTimeAbs" value="25.0" />
+	  <param name="Frametime" value="75	" />
+  </node>
+
+  <node ns="my_stereo" pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc" args="image:=image_raw _approximate_sync:=True" />
+
+</launch>

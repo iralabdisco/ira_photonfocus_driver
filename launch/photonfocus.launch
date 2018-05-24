@@ -1,0 +1,31 @@
+<launch> 
+  <!-- 
+	Valori exposure: IMPOSTARE SU OGNUNA DELLE DUE CAMERE
+				* esterno luce solare		   	 0.1
+				* esterno con cielo da pioggia 	 0.5
+				* garage u5:					25.0
+
+				*luce del mattino ore 8.00 autunno 17.10.16		tra 1.0 e 2.0 (2 meglio)
+  -->
+
+  <!-- PHOTONFOCUS DRIVER LEFT -->
+	  <node pkg="ira_photonfocus_driver" type="ira_photonfocus_driver_mono" name="left" output="screen">
+	    <param name="ip" value="192.168.1.221"/>
+			<param name="Height" value="541" />
+	    	<param name="OffsetY" value="350" />
+		  	<param name="ExposureTimeAbs" value="0.4" />
+		  	<param name="Frametime" value="100" /> <!-- was 75 -->
+	  </node>
+
+  <!-- PHOTONFOCUS DRIVER RIGHT -->
+	  <node pkg="ira_photonfocus_driver" type="ira_photonfocus_driver_mono" name="right"  output="screen">
+	    	<param name="ip" value="192.168.1.220"/>
+			<param name="Height" value="541" />
+	    	<param name="OffsetY" value="350" />
+		  	<param name="ExposureTimeAbs" value="0.4" />
+	  </node>
+
+  <!-- STEREO IMAGE PROCESSOR -->
+	  <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc" args="image:=image_raw _approximate_sync:=True" />
+
+</launch>
