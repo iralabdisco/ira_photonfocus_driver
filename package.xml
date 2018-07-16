@@ -45,7 +45,6 @@
   <build_depend>roscpp</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
   <build_depend>camera_info_manager</build_depend>
-  <build_depend>driver_base</build_depend>
   <build_depend>curl</build_depend>
   <build_depend>libneon27-gnutls-dev</build_depend>
   <run_depend>cv_bridge</run_depend>

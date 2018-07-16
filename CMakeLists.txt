@@ -153,7 +153,6 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   dynamic_reconfigure
-  driver_base
   camera_info_manager
 )
 
