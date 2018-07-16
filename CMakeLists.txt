@@ -248,7 +248,7 @@ endif(NOT GNUTLS_FOUND)
 # )
 
 generate_dynamic_reconfigure_options(
-  cfg/photonfocus.cfg
+  cfg/photonfocus_mono.cfg
 )
 
 ###################################
