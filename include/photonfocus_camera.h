@@ -38,6 +38,13 @@ do{\
 
 namespace IRALab
 {
+
+// this was imported from driver_common, since the latter seems deprecated.
+enum {
+  RECONFIGURE_CLOSE = 3,
+  RECONFIGURE_STOP = 1,
+  RECONFIGURE_RUNNING = 0,
+};
 class PhotonFocusCamera
 {
     // FIXME it is necessary to specialize the exceptions...

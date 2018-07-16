@@ -23,7 +23,6 @@
 #include <photonfocus_camera.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <driver_base/SensorLevels.h>
 #include <ira_photonfocus_driver/photonfocus_monoConfig.h>
 
 #include <camera_info_manager/camera_info_manager.h>
@@ -106,7 +105,7 @@ public:
 
     void configCb(photonfocus_camera::photonfocus_monoConfig & config, uint32_t level)
     {
-        if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
+        if(level >= (uint32_t) IRALab::RECONFIGURE_STOP)
             camera->stop();
 
         camera->setDeviceAttribute<PvGenEnum,std::string>("PixelFormat","Mono8");
@@ -139,7 +138,7 @@ public:
         }
         camera->setDeviceAttribute<PvGenInteger,long>("Voltages_BlackLevelOffset",config.Voltages_BlackLevelOffset);
 
-        if(level >= (uint32_t) driver_base::SensorLevels::RECONFIGURE_STOP)
+        if(level >= (uint32_t) IRALab::RECONFIGURE_STOP)
             camera->start();
     }
 
