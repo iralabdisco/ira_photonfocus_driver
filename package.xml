@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>ira_photonfocus_driver</name>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <description>ROS sensor driver for PhotonFocus cameras</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
